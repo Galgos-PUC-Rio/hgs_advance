@@ -1,0 +1,23 @@
+[package]
+name = "hgs_advance"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone CLI for running hgs_advance (HGS-VRPTW/CVRP) on classical benchmark instances"
+
+# Empty table detaches this crate from any parent Cargo workspace (e.g. the
+# tig-monorepo workspace this directory happens to live under), so it builds
+# and runs fully independently.
+[workspace]
+
+[dependencies]
+anyhow = "1.0.81"
+rand = { version = "0.8.5", default-features = false, features = [
+    "std_rng",
+    "small_rng",
+] }
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.113"
+
+[profile.release]
+lto = true
+codegen-units = 1
