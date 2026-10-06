@@ -5,8 +5,27 @@ use std::io::{BufRead, BufReader};
 
 pub struct VRPTWLoader;
 
+/// How Euclidean distances (and travel times) are turned into integers.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DistanceConvention {
+    /// d(i,j) = nint(euclid(i,j)), no scaling (default).
+    Round,
+    /// Legacy hgs_advance convention: coordinates and times x10, distances truncated.
+    Trunc10,
+}
+
+impl DistanceConvention {
+    /// Factor that converts internal distance units back to instance units.
+    pub fn scale(self) -> f64 {
+        match self {
+            DistanceConvention::Round => 1.0,
+            DistanceConvention::Trunc10 => 10.0,
+        }
+    }
+}
+
 impl VRPTWLoader {
-    pub fn load(path: &str) -> Result<Problem> {
+    pub fn load(path: &str, convention: DistanceConvention) -> Result<Problem> {
         let file = File::open(path).map_err(|e| anyhow!("Cannot open VRPTW file '{}': {}", path, e))?;
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
@@ -75,12 +94,16 @@ impl VRPTWLoader {
             if node.0 != idx {
                 return Err(anyhow!("VRPTW nodes should be ordered from 0 to n-1"));
             }
-            // Solomon convention: multiply coordinates and times by 10, and truncate Euclidean distances
-            node_positions[idx] = (10 * node.1, 10 * node.2);
+            let f = match convention {
+                DistanceConvention::Round => 1,
+                // Legacy: multiply coordinates and times by 10, and truncate Euclidean distances
+                DistanceConvention::Trunc10 => 10,
+            };
+            node_positions[idx] = (f * node.1, f * node.2);
             node_data[idx] = NodeData {
-                start_tw: 10 * node.4,
-                end_tw: 10 * node.5,
-                service_time: 10 * node.6,
+                start_tw: f * node.4,
+                end_tw: f * node.5,
+                service_time: f * node.6,
                 demand: node.3,
             };
         }
@@ -90,7 +113,13 @@ impl VRPTWLoader {
             for j in 0..nb_nodes {
                 let dx = (node_positions[i].0 - node_positions[j].0) as f64;
                 let dy = (node_positions[i].1 - node_positions[j].1) as f64;
-                distance_matrix[i * nb_nodes + j] = dx.hypot(dy) as i32;
+                let e = dx.hypot(dy);
+                distance_matrix[i * nb_nodes + j] = match convention {
+                    // nearest integer (halves rounded up; coordinates are integers so
+                    // an exact .5 cannot actually occur for a Euclidean norm)
+                    DistanceConvention::Round => e.round() as i32,
+                    DistanceConvention::Trunc10 => e as i32,
+                };
             }
         }
 
@@ -105,7 +134,10 @@ impl VRPTWLoader {
             is_vrptw: true,
             fixed_distance_offset: 0,
             max_capacity,
+            travel_matrix: distance_matrix.clone(),
             distance_matrix,
+            vehicle_cost: 0,
+            penalty_max: 10_000,
             node_positions,
             node_data,
         })

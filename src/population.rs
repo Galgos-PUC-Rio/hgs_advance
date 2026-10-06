@@ -309,20 +309,21 @@ impl Population {
                 false
             };
 
-            // Increase if < 30%, otherwise decrease (clamped to [1, 10000])
+            // Increase if < target, otherwise decrease (clamped to [1, penalty_max])
+            let pmax = self.data.penalty_max as f64;
             if frac_cap < params.target_ratio {
                 params.penalty_capa =
-                    (((params.penalty_capa as f64) * 1.3).ceil()).clamp(1.0, 10_000.0) as usize;
+                    (((params.penalty_capa as f64) * 1.3).ceil()).clamp(1.0, pmax) as usize;
             } else if !block_penalty_decrease {
                 params.penalty_capa =
-                    (((params.penalty_capa as f64) * 0.7).floor()).clamp(1.0, 10_000.0) as usize;
+                    (((params.penalty_capa as f64) * 0.7).floor()).clamp(1.0, pmax) as usize;
             }
             if frac_tw < params.target_ratio {
                 params.penalty_tw =
-                    (((params.penalty_tw as f64) * 1.3).ceil()).clamp(1.0, 10_000.0) as usize;
+                    (((params.penalty_tw as f64) * 1.3).ceil()).clamp(1.0, pmax) as usize;
             } else {
                 params.penalty_tw =
-                    (((params.penalty_tw as f64) * 0.7).floor()).clamp(1.0, 10_000.0) as usize;
+                    (((params.penalty_tw as f64) * 0.7).floor()).clamp(1.0, pmax) as usize;
             }
 
             self.since_last_adapt = 0;

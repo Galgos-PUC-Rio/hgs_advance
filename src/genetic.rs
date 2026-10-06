@@ -21,6 +21,9 @@ pub struct Genetic {
     pub population: Population,
     pub client_expansion: Vec<Vec<usize>>,
     pub fixed_routes: Vec<Vec<usize>>,
+    /// When true, `run` returns as soon as the population holds a feasible
+    /// solution (used to probe whether a fleet of k vehicles is feasible).
+    pub stop_at_first_feasible: bool,
 }
 
 impl Genetic {
@@ -37,6 +40,7 @@ impl Genetic {
             population,
             client_expansion,
             fixed_routes: Vec::new(),
+            stop_at_first_feasible: false,
         }
     }
 
@@ -194,14 +198,23 @@ impl Genetic {
         for it in 0..self.params.mu_start {
             self.generate_initial_individual(rng, &mut ls, it > 0);
             self.track_best_and_save(&mut best_metric, save_solution);
+            if self.stop_at_first_feasible && !self.population.feasible.indivs.is_empty() {
+                break;
+            }
+            if time_limit_secs.map_or(false, |tl| t0.elapsed().as_secs_f64() >= tl) {
+                break;
+            }
         }
+        let skip_evolution = (self.stop_at_first_feasible && !self.population.feasible.indivs.is_empty())
+            || self.population.feasible.indivs.len() + self.population.infeasible.indivs.len() < 2;
 
         self.population.consensus_enabled = true;
         self.population.reset_consensus_epoch();
         let mut best_metric = Some(best_metric.unwrap_or_else(|| self.population.best_metric()));
         let mut it_noimprov: usize = 0;
         let mut it_total: usize = 0;
-        while it_noimprov < self.params.max_it_noimprov
+        while !skip_evolution
+            && it_noimprov < self.params.max_it_noimprov
             && it_total < self.params.max_it_total
             && time_limit_secs.map_or(true, |tl| t0.elapsed().as_secs_f64() < tl)
         {
@@ -262,6 +275,9 @@ impl Genetic {
                 it_noimprov = 0;
             }
             else { it_noimprov += 1; }
+            if self.stop_at_first_feasible && !self.population.feasible.indivs.is_empty() {
+                break;
+            }
 
             if (it_total + 1) % self.params.nb_it_compression == 0 {
                 self.apply_compression(&mut ls, rng, &mut reserved_seed_ind);
@@ -529,6 +545,9 @@ impl Genetic {
         let inf = i64::MAX / 4;
 
         let mut dist_from_depot: Vec<i64> = vec![0; n];
+        // Travel time from the depot (differs from dist_from_depot when a fixed
+        // vehicle cost is folded into the depot->client cost arcs).
+        let mut time_from_depot: Vec<i64> = vec![0; n];
         let mut dist_to_depot: Vec<i64> = vec![0; n];
         let mut edge_prefix: Vec<i64> = vec![0; n];
         let mut service: Vec<i64> = vec![0; n];
@@ -540,6 +559,7 @@ impl Genetic {
         for t in 0..n {
             let id = giant[t];
             dist_from_depot[t] = self.data.dm(0, id) as i64;
+            time_from_depot[t] = self.data.tm(0, id) as i64;
             dist_to_depot[t] = self.data.dm(id, 0) as i64;
             service[t] = self.data.nd(id).service_time as i64;
             tw_start[t] = self.data.nd(id).start_tw as i64;
@@ -549,7 +569,7 @@ impl Genetic {
                 let prev_id = giant[t - 1];
                 let edge = self.data.dm(prev_id, id) as i64;
                 edge_prefix[t] = edge_prefix[t - 1] + edge;
-                s_prefix[t] = s_prefix[t - 1] + service[t - 1] + edge;
+                s_prefix[t] = s_prefix[t - 1] + service[t - 1] + self.data.tm(prev_id, id) as i64;
             }
         }
 
@@ -562,9 +582,9 @@ impl Genetic {
         for x in 1..=n {
             let t = x - 1;
             if t == 0 {
-                duration = dist_from_depot[0].max(tw_start[0]);
+                duration = time_from_depot[0].max(tw_start[0]);
             } else {
-                let edge = edge_prefix[t] - edge_prefix[t - 1];
+                let edge = s_prefix[t] - s_prefix[t - 1] - service[t - 1];
                 duration = (duration + service[t - 1] + edge).max(tw_start[t]);
             }
             let time_limit = tw_end[t];
@@ -642,7 +662,7 @@ impl Genetic {
                                     if wf < nw { waiting.pop_front(); } else { break; }
                                 }
                                 let Some(j_wait) = waiting.front() else { break; };
-                                let left = dist_from_depot[nw] + (s_t - s_prefix[nw]);
+                                let left = time_from_depot[nw] + (s_t - s_prefix[nw]);
                                 let right = tw_start[j_wait] + (s_t - s_prefix[j_wait]);
                                 let rw = (left.max(right) - tw_end_t).max(0);
                                 r[nw] = rw;

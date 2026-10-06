@@ -1,6 +1,7 @@
 use super::genetic::Genetic;
 use super::loader_cvrp::CVRPLoader;
-use super::loader_vrptw::VRPTWLoader;
+use super::loader_vrptw::{DistanceConvention, VRPTWLoader};
+use super::hierarchical::{HierMode, HierSolver, Found};
 use super::params::Params;
 use super::problem::Problem;
 use super::reverse_mode;
@@ -29,13 +30,7 @@ impl Solver {
     /// feasible (as produced by `best_feasible()` / incumbent tracking), so
     /// this plain distance sum equals the true (unpenalized) cost.
     fn route_distance(data: &Problem, routes: &[Vec<usize>]) -> i32 {
-        let mut total = 0i64;
-        for route in routes {
-            for w in route.windows(2) {
-                total += data.dm(w[0], w[1]) as i64;
-            }
-        }
-        total as i32
+        data.travel_distance(routes) as i32
     }
 
     fn write_solution_to_file(
@@ -44,7 +39,7 @@ impl Solver {
         cost: i32,
         nb_routes: usize,
         cpu_time_secs: f64,
-        run_type: RunType,
+        scale: f64,
     ) -> Result<()> {
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
@@ -69,16 +64,13 @@ impl Solver {
             route_id += 1;
         }
 
-        // hgs_advance's internal VRPTW distances are computed over coordinates and
-        // times scaled x10 (1-decimal integer arithmetic, the standard Solomon-instance
-        // convention). Descale here so the reported cost matches published
-        // CVRPLib/Solomon best-known-solution units. CVRP distances are already in
-        // native (unscaled) units.
-        let scale = match run_type {
-            RunType::Vrptw => 10.0,
-            RunType::Cvrp => 1.0,
-        };
-        writeln!(writer, "Cost {:.2}", cost as f64 / scale)?;
+        // `scale` converts internal integer distances back to instance units
+        // (10 for the legacy x10-truncated VRPTW convention, 1 otherwise).
+        if scale == 1.0 {
+            writeln!(writer, "Cost {}", cost)?;
+        } else {
+            writeln!(writer, "Cost {:.2}", cost as f64 / scale)?;
+        }
         writeln!(writer, "NB_ROUTES: {}", nb_routes)?;
         writeln!(writer, "CPU_TIME: {:.6}", cpu_time_secs)?;
         writer.flush()?;
@@ -121,13 +113,15 @@ impl Solver {
         output_dir: Option<&Path>,
         time_limit_secs: Option<f64>,
         seed_byte: Option<u8>,
+        convention: DistanceConvention,
     ) -> Result<Option<(Solution, i32, usize)>> {
         let t0 = Instant::now();
+        let scale = if run_type == RunType::Vrptw { convention.scale() } else { 1.0 };
         let path_str = instance_path
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("Instance path is not valid UTF-8"))?;
         let mut data = match run_type {
-            RunType::Vrptw => VRPTWLoader::load(path_str)?,
+            RunType::Vrptw => VRPTWLoader::load(path_str, convention)?,
             RunType::Cvrp => CVRPLoader::load(path_str)?,
         };
         if let Some(seed) = seed_byte {
@@ -159,7 +153,7 @@ impl Solver {
                     cost,
                     nb_routes,
                     checkpoint_t0.elapsed().as_secs_f64(),
-                    run_type,
+                    scale,
                 )
             }
         });
@@ -171,7 +165,7 @@ impl Solver {
             Ok(Some((solution, cost, routes))) => {
                 if let Some(path) = &checkpoint_path {
                     let cpu_time_secs = t0.elapsed().as_secs_f64();
-                    Self::write_solution_to_file(path, &solution, cost, routes, cpu_time_secs, run_type)?;
+                    Self::write_solution_to_file(path, &solution, cost, routes, cpu_time_secs, scale)?;
                 }
                 Ok(Some((solution, cost, routes)))
             }
@@ -181,5 +175,66 @@ impl Solver {
                 Ok(None)
             }
         }
+    }
+
+    /// Hierarchical objective (#vehicles first, distance second) for VRPTW.
+    /// Returns the best solution found as (routes, true distance, #routes).
+    pub fn solve_hierarchical_file(
+        instance_path: &Path,
+        mode: HierMode,
+        hyperparameters: &Option<Map<String, Value>>,
+        output_dir: Option<&Path>,
+        time_limit_secs: f64,
+        probe_time_secs: f64,
+        seed_byte: Option<u8>,
+        convention: DistanceConvention,
+        verbose: bool,
+    ) -> Result<Option<Found>> {
+        let t0 = Instant::now();
+        let scale = convention.scale();
+        let path_str = instance_path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Instance path is not valid UTF-8"))?;
+        let mut data = VRPTWLoader::load(path_str, convention)?;
+        if let Some(seed) = seed_byte {
+            data.seed = [seed; 32];
+        }
+        let mut params = Params::initialize(hyperparameters, &data);
+        // The decomposition ("reverse") mode assumes a free fleet and a feasible
+        // constructive start; the hierarchical drivers use the plain HGS instead.
+        params.decomp_nb_phases = 0;
+        let mut rng = SmallRng::from_seed(data.seed);
+
+        let checkpoint_path: Option<PathBuf> = output_dir.map(|dir| {
+            let stem = instance_path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "solution".to_string());
+            dir.join(format!("{}.sol", stem))
+        });
+        let save = |f: &Found| -> Result<()> {
+            if let Some(path) = &checkpoint_path {
+                Self::write_solution_to_file(
+                    path,
+                    &Solution { routes: f.routes.clone() },
+                    f.distance as i32,
+                    f.nb_routes,
+                    f.time_found,
+                    scale,
+                )?;
+            }
+            Ok(())
+        };
+        let mut hs = HierSolver {
+            base: data,
+            params,
+            t0,
+            time_limit: time_limit_secs,
+            probe_time: probe_time_secs,
+            verbose,
+            on_improve: Some(&save),
+            best: None,
+        };
+        Ok(hs.solve(mode, &mut rng))
     }
 }

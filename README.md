@@ -83,6 +83,30 @@ implicit at the start/end of each route). `Cost` is the total distance, already
 in the same units used by CVRPLib/Solomon best-known-solution tables — no
 manual conversion needed.
 
+## Hierarchical objective for VRPTW: vehicles first, then distance
+
+By default (`--mode distance`) hgs_advance minimizes total distance only. The
+following modes minimize **(1) the number of routes, then (2) the total
+distance** (ties in (1) broken by (2)). They use `--time-limit` (default 60 s)
+and, unless `--exploration-level` is given, exploration level 5 with GA restarts
+until the time limit.
+
+| Mode | What it does |
+|---|---|
+| `--mode k-search` | **Option 1.** HGS runs with a *fixed fleet of k vehicles* and minimizes distance only. Outside, k is chosen by binary search on [capacity lower bound, routes of the first feasible solution]. A probe that finds no feasible solution within `--probe-time` seconds (default: 10% of the time limit) is assumed infeasible, so only larger k are tried; a probe that succeeds with r routes sets the upper bound to r. The remaining time minimizes distance with the smallest k found. |
+| `--mode lexico` | **Option 2.** One search on `M * #routes + distance`, where M exceeds any possible total distance (exact lexicographic order). M is added to the cost of every depot->client arc, travel times are kept separately, so all move evaluations stay exact. |
+| `--mode fixed-k --k K` | Minimize distance with at most K vehicles (one fixed-fleet run). |
+
+Distances: `--distance round` (default) uses `nint(euclidean)` with no scaling,
+for both cost and travel time; `--distance trunc10` restores the legacy
+x10-and-truncate convention. `tools/check_sol.py <instance> <solution.sol>`
+independently checks a solution (capacity, time windows, nint distances).
+
+```bash
+./target/release/hgs_advance --instance XTW-n101-h5d80wMcCsLqM.txt --mode k-search --time-limit 60 --output-dir results
+./target/release/hgs_advance --instance XTW-n101-h5d80wMcCsLqM.txt --mode lexico   --time-limit 60 --output-dir results
+```
+
 ## 4. All the options
 
 ```

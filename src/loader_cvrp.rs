@@ -126,7 +126,10 @@ impl CVRPLoader {
             is_vrptw: false,
             fixed_distance_offset: 0,
             max_capacity,
+            travel_matrix: distance_matrix.clone(),
             distance_matrix,
+            vehicle_cost: 0,
+            penalty_max: 10_000,
             node_positions,
             node_data,
         })

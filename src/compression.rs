@@ -66,11 +66,13 @@ impl ProblemCompression {
 
         let nb_nodes = compact_clients + 1;
         let mut distance_matrix = vec![0i32; nb_nodes * nb_nodes];
+        let mut travel_matrix = vec![0i32; nb_nodes * nb_nodes];
         for i in 0..nb_nodes {
             let from = if i == 0 { 0 } else { last_orig[i] };
             for j in 0..nb_nodes {
                 let to = if j == 0 { 0 } else { first_orig[j] };
                 distance_matrix[i * nb_nodes + j] = data.dm(from, to);
+                travel_matrix[i * nb_nodes + j] = data.tm(from, to);
             }
         }
 
@@ -88,6 +90,9 @@ impl ProblemCompression {
             fixed_distance_offset: data.fixed_distance_offset + fixed_distance as i64,
             max_capacity: data.max_capacity,
             distance_matrix,
+            travel_matrix,
+            vehicle_cost: data.vehicle_cost,
+            penalty_max: data.penalty_max,
             node_positions,
             node_data,
         };

@@ -121,11 +121,13 @@ fn build_subproblem(data: &Problem, clients: &[usize], vehicles_hint: usize) -> 
     }
 
     let mut distance_matrix = vec![0i32; nb_nodes * nb_nodes];
+    let mut travel_matrix = vec![0i32; nb_nodes * nb_nodes];
     for i in 0..nb_nodes {
         let gi = local_to_global[i];
         for j in 0..nb_nodes {
             let gj = local_to_global[j];
             distance_matrix[i * nb_nodes + j] = data.dm(gi, gj);
+            travel_matrix[i * nb_nodes + j] = data.tm(gi, gj);
         }
     }
 
@@ -143,6 +145,9 @@ fn build_subproblem(data: &Problem, clients: &[usize], vehicles_hint: usize) -> 
             fixed_distance_offset: 0,
             max_capacity: data.max_capacity,
             distance_matrix,
+            travel_matrix,
+            vehicle_cost: data.vehicle_cost,
+            penalty_max: data.penalty_max,
             node_positions,
             node_data,
         },
@@ -215,10 +220,10 @@ pub(super) fn solve_reversed_mode(
             let old_capa = params.penalty_capa;
             let old_tw = params.penalty_tw;
             if had_capa {
-                params.penalty_capa = (2 * params.penalty_capa).min(10_000);
+                params.penalty_capa = (2 * params.penalty_capa).min(data_arc.penalty_max);
             }
             if had_tw {
-                params.penalty_tw = (2 * params.penalty_tw).min(10_000);
+                params.penalty_tw = (2 * params.penalty_tw).min(data_arc.penalty_max);
             }
             trace!(
                 "----- {}: INCREASING PENALTIES -> CAP {} -> {}, TW {} -> {}",

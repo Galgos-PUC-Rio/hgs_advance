@@ -1345,8 +1345,8 @@ impl LocalSearch {
     ) -> Vec<Vec<usize>> {
         self.params = params;
         debug_assert!(!self.routes.is_empty(), "continue_repair requires a loaded LS state");
-        self.params.penalty_tw = factor.saturating_mul(self.params.penalty_tw).min(10_000);
-        self.params.penalty_capa = factor.saturating_mul(self.params.penalty_capa).min(10_000);
+        self.params.penalty_tw = factor.saturating_mul(self.params.penalty_tw).min(self.data.penalty_max);
+        self.params.penalty_capa = factor.saturating_mul(self.params.penalty_capa).min(self.data.penalty_max);
         self.nb_moves += 1;
         for rid in 0..self.routes.len() {
             self.when_last_modified[rid] = 0;

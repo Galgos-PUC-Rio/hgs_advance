@@ -135,7 +135,7 @@ impl Params {
     /// Preset parameter configurations for exploration levels.
     /// Initial penalties are scaled from instance characteristics.
     pub(super) fn preset(exploration_level: usize, data: &Problem) -> Self {
-        let max_dist = data.distance_matrix.iter().copied().max().unwrap_or(1) as f64;
+        let max_dist = data.travel_matrix.iter().copied().max().unwrap_or(1) as f64;
         let max_demand = data
             .node_data
             .iter()

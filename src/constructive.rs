@@ -8,7 +8,7 @@ impl Constructive {
         let mut routes = Vec::new();
         let mut nodes: Vec<usize> = (1..data.nb_nodes).collect();
         let n = nodes.len();
-        nodes.sort_by(|&a, &b| data.dm(0,a).cmp(&data.dm(0,b)));
+        nodes.sort_by(|&a, &b| data.tm(0,a).cmp(&data.tm(0,b)));
 
         if randomize {
             for i in 0..(n - 1) { nodes.swap(i, rng.gen_range(i + 1..=(i + 10).min(n - 1))); }
@@ -60,18 +60,18 @@ impl Constructive {
             for pos in 1..route.len() {
                 let next_node = route[pos];
                 let new_arrival_time_insert_node = insert_nd.start_tw
-                    .max(curr_time + data.dm(curr_node,insert_node));
+                    .max(curr_time + data.tm(curr_node,insert_node));
                 if new_arrival_time_insert_node > insert_nd.end_tw {
                     break;
                 }
 
                 // Extra distance caused by insertion
-                let c11 = data.dm(curr_node,insert_node)
-                    + data.dm(insert_node,next_node)
-                    - data.dm(curr_node,next_node);
+                let c11 = data.tm(curr_node,insert_node)
+                    + data.tm(insert_node,next_node)
+                    - data.tm(curr_node,next_node);
 
                 // Gain of distance compared to a direct trip
-                let c2 = data.dm(0,insert_node) - c11;
+                let c2 = data.tm(0,insert_node) - c11;
 
                 let c2_is_better = match best_c2 {
                     None => true,
@@ -93,7 +93,7 @@ impl Constructive {
 
                 let next_nd = data.nd(next_node);
                 curr_time = next_nd.start_tw
-                    .max(curr_time + data.dm(curr_node,next_node))
+                    .max(curr_time + data.tm(curr_node,next_node))
                     + next_nd.service_time;
                 curr_node = next_node;
             }
@@ -111,7 +111,7 @@ impl Constructive {
         for pos in start_pos..route.len() {
             let next_node = route[pos];
             let next_nd = data.nd(next_node);
-            curr_time += data.dm(curr_node,next_node);
+            curr_time += data.tm(curr_node,next_node);
             if curr_time > next_nd.end_tw {
                 return false;
             }
