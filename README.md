@@ -90,8 +90,8 @@ with the same convention.
 
 ```bash
 ./target/release/hgs_advance <instance> [time_limit_seconds]
-./target/release/hgs_advance XTW-n101.txt 1800          # your own instance path
-./target/release/hgs_advance XTW-n101.txt 60 --quiet    # only print the final line
+./target/release/hgs_advance instance.txt 1800          # your own instance path
+./target/release/hgs_advance instance.txt 60 --quiet    # only print the final line
 ```
 
 This is equivalent to VRPTW, `--mode k-search` (routes first, then distance),
@@ -110,19 +110,15 @@ until the time limit.
 |---|---|
 | `--mode k-search` | **Option 1.** HGS runs with a *fixed fleet of k vehicles* and minimizes distance only. Outside, k is chosen by binary search on [capacity lower bound, routes of the first feasible solution]. A probe that finds no feasible solution within `--probe-time` seconds (default: 10% of the time limit) is assumed infeasible, so only larger k are tried (a heuristic: it is not a proof of infeasibility, so the minimum number of routes found is an upper bound); a probe that succeeds with r routes sets the upper bound to r. The remaining time minimizes distance with the smallest k found. |
 | `--mode lexico` | **Option 2.** One search on `M * #routes + distance`, where M exceeds any possible total distance (exact lexicographic order). M is added to the cost of every depot->client arc, travel times are kept separately, so all move evaluations stay exact. |
-| `--mode fixed-k --k K` | Minimize distance with at most K vehicles (one fixed-fleet run). |
+| `--mode fixed-k --k K` | Minimize distance with a fleet of K vehicles (one fixed-fleet run). If K is below the capacity lower bound (total demand / capacity, rounded up), it is raised to that bound; a K that is too low for the time windows may end with no feasible solution. |
 
 Distances: `--distance round` (default) uses `nint(euclidean)` with no scaling,
 for both cost and travel time; `--distance trunc10` restores the legacy
-x10-and-truncate convention. `tools/check_sol.py <instance> <solution.sol>`
-independently checks a solution (capacity, time windows, nint distances).
-`tools/build_standalone.sh` builds a self-contained binary, and `tools/tune.sh`,
-`tools/tune_configs*.txt` and `tools/tune_summary.py` were used to calibrate the
-configuration of the simple call.
+x10-and-truncate convention.
 
 ```bash
-./target/release/hgs_advance --instance XTW-n101.txt --mode k-search --time-limit 60 --output-dir results
-./target/release/hgs_advance --instance XTW-n101.txt --mode lexico   --time-limit 60 --output-dir results
+./target/release/hgs_advance --instance instance.txt --mode k-search --time-limit 60 --output-dir results
+./target/release/hgs_advance --instance instance.txt --mode lexico   --time-limit 60 --output-dir results
 ```
 
 ## 4. All the options
@@ -196,8 +192,7 @@ Modifications in this repository: a standalone command-line program for
 classical VRPTW/CVRP instance files (wall-clock time limit, output directory,
 incremental checkpointing), a hierarchical VRPTW objective (number of routes,
 then distance) with the `k-search`, `lexico` and `fixed-k` modes,
-`nint` distances without scaling, a simple command-line call, and extra tooling
-in `tools/`.
+`nint` distances without scaling, and a simple command-line call.
 
 These modifications are published under the same license as the original code:
 the **TIG Open Data License v3.0** (see [`LICENSE.md`](LICENSE.md) and
