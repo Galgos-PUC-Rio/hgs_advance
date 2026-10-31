@@ -1,9 +1,0 @@
-# name          arguments (k-search = option 1, lexico = option 2)
-ks_l5           --mode k-search
-ks_l6           --mode k-search --exploration-level 6
-ks_l5_gran40    --mode k-search --param granularity=40 --param granularity2=50
-ks_l5_noimp5k   --mode k-search --param max_it_noimprov=5000
-ks_l5_nocomp    --mode k-search --param nb_it_compression=1000000000
-ks_l5_swap3     --mode k-search --param allow_swap3=true
-lx_l5           --mode lexico
-lx_l6           --mode lexico --exploration-level 6
