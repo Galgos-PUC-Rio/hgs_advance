@@ -10,8 +10,7 @@ Genetic Search algorithm originally developed by Thibaut Vidal for
 This is a research/experimentation tool, not a polished product. This README
 assumes no prior experience with Rust.
 
-**License:** not yet decided — see the note at the bottom of this file before
-using this for anything beyond your own local experiments.
+**License:** this is a modified version of `hgs_advance` (TIG Open Data License v3.0). See [License and attribution](#license-and-attribution) at the bottom of this file and `LICENSE.md`.
 
 ## 1. Install Rust (one-time setup)
 
@@ -73,15 +72,31 @@ The `.sol` file looks like this:
 Route #1: 13 17 18 19 15 16 14 12
 Route #2: 5 3 7 8 10 11 9 6 4 2 1
 Route #3: 20 24 23 22 21
-Cost 190.90
+Cost 191
 NB_ROUTES: 3
 CPU_TIME: 0.004207
 ```
 
-Each `Route #k` line lists the customers visited, in order (the depot is
-implicit at the start/end of each route). `Cost` is the total distance, already
-in the same units used by CVRPLib/Solomon best-known-solution tables — no
-manual conversion needed.
+(Format example; the numbers are illustrative.) Each `Route #k` line lists the
+customers visited, in order (the depot is implicit at the start/end of each
+route). `Cost` is the total distance under the selected distance convention.
+With the default `--distance round`, every arc is `nint(Euclidean distance)`, so
+costs are integers and **differ from the values in the literature** that use
+real-valued or x10-truncated distances (e.g. Solomon C101 gives 829 here, versus
+827.3 with real distances). Compare results only against references computed
+with the same convention.
+
+### Simple call
+
+```bash
+./target/release/hgs_advance <instance> [time_limit_seconds]
+./target/release/hgs_advance XTW-n101.txt 1800          # your own instance path
+./target/release/hgs_advance XTW-n101.txt 60 --quiet    # only print the final line
+```
+
+This is equivalent to VRPTW, `--mode k-search` (routes first, then distance),
+exploration level 5 and `max_it_noimprov=5000`, writing `<instance-name>.sol`
+to the current directory. Instance files are not included in this repository.
 
 ## Hierarchical objective for VRPTW: vehicles first, then distance
 
@@ -93,7 +108,7 @@ until the time limit.
 
 | Mode | What it does |
 |---|---|
-| `--mode k-search` | **Option 1.** HGS runs with a *fixed fleet of k vehicles* and minimizes distance only. Outside, k is chosen by binary search on [capacity lower bound, routes of the first feasible solution]. A probe that finds no feasible solution within `--probe-time` seconds (default: 10% of the time limit) is assumed infeasible, so only larger k are tried; a probe that succeeds with r routes sets the upper bound to r. The remaining time minimizes distance with the smallest k found. |
+| `--mode k-search` | **Option 1.** HGS runs with a *fixed fleet of k vehicles* and minimizes distance only. Outside, k is chosen by binary search on [capacity lower bound, routes of the first feasible solution]. A probe that finds no feasible solution within `--probe-time` seconds (default: 10% of the time limit) is assumed infeasible, so only larger k are tried (a heuristic: it is not a proof of infeasibility, so the minimum number of routes found is an upper bound); a probe that succeeds with r routes sets the upper bound to r. The remaining time minimizes distance with the smallest k found. |
 | `--mode lexico` | **Option 2.** One search on `M * #routes + distance`, where M exceeds any possible total distance (exact lexicographic order). M is added to the cost of every depot->client arc, travel times are kept separately, so all move evaluations stay exact. |
 | `--mode fixed-k --k K` | Minimize distance with at most K vehicles (one fixed-fleet run). |
 
@@ -101,6 +116,9 @@ Distances: `--distance round` (default) uses `nint(euclidean)` with no scaling,
 for both cost and travel time; `--distance trunc10` restores the legacy
 x10-and-truncate convention. `tools/check_sol.py <instance> <solution.sol>`
 independently checks a solution (capacity, time windows, nint distances).
+`tools/build_standalone.sh` builds a self-contained binary, and `tools/tune.sh`,
+`tools/tune_configs*.txt` and `tools/tune_summary.py` were used to calibrate the
+configuration of the simple call.
 
 ```bash
 ./target/release/hgs_advance --instance XTW-n101-h5d80wMcCsLqM.txt --mode k-search --time-limit 60 --output-dir results
@@ -166,21 +184,25 @@ still have the best solution found so far on disk.
   is expected without `--time-limit`; either wait, or re-run with a time
   limit and/or lower exploration level.
 
-## About this code
+## License and attribution
 
-This is an extracted, standalone version of `hgs_advance`, an "advance"
-algorithm submission by Thibaut Vidal to
-[The Innovation Game](https://github.com/tig-foundation/tig-monorepo)
-(`tig-algorithms/src/vehicle_routing/hgs_advance`). It has been adapted here
-to run directly on classical instance files (rather than TIG's own on-chain
-challenge format) with a few practical additions: a wall-clock time limit,
-configurable output location, incremental checkpointing of the best solution
-found so far, and correctly-scaled costs in the `.sol` output. The underlying
-optimization algorithm itself is unmodified.
+This repository is a modified version of `hgs_advance` by Thibaut Vidal
+(© 2026), submitted to The Innovation Game (TIG) `vehicle_routing` challenge
+(Unique Algorithm Identifier `c002_a110`). The upstream code is at
+<https://github.com/tig-foundation/hgs-advance>; it builds on HGS-CVRP and on
+TIG's `hgs_v1`.
 
-**License:** this repository doesn't have a finalized license yet. The
-original code is covered by TIG's own multi-license model (see
-[TIG's licensing docs](https://github.com/tig-foundation/tig-monorepo/tree/main/docs/licenses)),
-which has implications if results or code derived from it are published or
-redistributed. Don't treat anything here as cleared for redistribution,
-publication, or commercial use until that's explicitly sorted out.
+Modifications in this repository: a standalone command-line program for
+classical VRPTW/CVRP instance files (wall-clock time limit, output directory,
+incremental checkpointing), a hierarchical VRPTW objective (number of routes,
+then distance) with the `k-search`, `lexico` and `fixed-k` modes,
+`nint` distances without scaling, a simple command-line call, and extra tooling
+in `tools/`.
+
+These modifications are published under the same license as the original code:
+the **TIG Open Data License v3.0** (see [`LICENSE.md`](LICENSE.md) and
+[`open_data_license.pdf`](open_data_license.pdf)), including its share-alike
+and open data terms. TIG also offers a **TIG Commercial License**
+([`commercial_license.pdf`](commercial_license.pdf)) for users who do not wish
+to comply with those terms. The copyright and license notices of the original
+code are kept.
