@@ -121,8 +121,8 @@ independently checks a solution (capacity, time windows, nint distances).
 configuration of the simple call.
 
 ```bash
-./target/release/hgs_advance --instance XTW-n101-h5d80wMcCsLqM.txt --mode k-search --time-limit 60 --output-dir results
-./target/release/hgs_advance --instance XTW-n101-h5d80wMcCsLqM.txt --mode lexico   --time-limit 60 --output-dir results
+./target/release/hgs_advance --instance XTW-n101.txt --mode k-search --time-limit 60 --output-dir results
+./target/release/hgs_advance --instance XTW-n101.txt --mode lexico   --time-limit 60 --output-dir results
 ```
 
 ## 4. All the options
