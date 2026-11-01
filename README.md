@@ -1,23 +1,26 @@
 # hgs_advance
 
-A command-line solver for the **Vehicle Routing Problem with Time Windows
-(VRPTW)** and the **Capacitated VRP (CVRP)**, based on the Hybrid Genetic Search
-(HGS) algorithm `hgs_advance` by Thibaut Vidal, submitted to
-[The Innovation Game (TIG)](https://tig.foundation/). It reads classical
-benchmark instances (Solomon, Gehring-Homberger, [CVRPLib](http://vrp.galgos.inf.puc-rio.br/))
-and writes the best solution found as a `.sol` file.
+This repository contains a modified version of `hgs_advance`, a Rust
+implementation of an "advanced" and scalable Hybrid Genetic Search (HGS) for the
+Vehicle Routing Problem with Time Windows (VRPTW) and the Capacitated Vehicle
+Routing Problem (CVRP), originally developed by Thibaut Vidal for
+[The Innovation Game (TIG)](https://tig.foundation/)
+([upstream repository](https://github.com/tig-foundation/hgs-advance)).
 
-This version adds a **hierarchical objective for VRPTW**: minimize the number
-of routes first, then the total distance (see
-[Hierarchical objective](#hierarchical-objective-for-vrptw-vehicles-first-then-distance)).
+Compared to the original, this version:
+
+- runs from the command line on classical instance files (Solomon,
+  Gehring-Homberger, [CVRPLib](http://vrp.galgos.inf.puc-rio.br/)) and writes the
+  best solution found as a `.sol` file;
+- adds a **hierarchical objective for VRPTW**: minimize the number of routes
+  first, then the total distance (see
+  [Hierarchical objective](#hierarchical-objective-for-vrptw-vehicles-first-then-distance)).
 
 This is a research tool, not a polished product. The instructions below assume
 no prior experience with Rust.
 
-*Modified version of TIG's `hgs_advance`, released under the TIG Open Data
-License v3.0. See [License and attribution](#license-and-attribution).*
-
-**License:** this is a modified version of `hgs_advance` (TIG Open Data License v3.0). See [License and attribution](#license-and-attribution) at the bottom of this file and `LICENSE.md`.
+*Released under the TIG Open Data License v3.0. See
+[License and attribution](#license-and-attribution).*
 
 ## 1. Install Rust (one-time setup)
 
