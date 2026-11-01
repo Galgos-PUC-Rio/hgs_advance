@@ -180,6 +180,18 @@ still have the best solution found so far on disk.
   is expected without `--time-limit`; either wait, or re-run with a time
   limit and/or lower exploration level.
 
+## Use of AI assistance
+
+The modifications in this repository (hierarchical VRPTW objective with the
+`k-search`, `lexico` and `fixed-k` modes, `nint` distances, the simple
+command-line call and the documentation) were developed with the assistance of
+an AI model (Claude, by Anthropic) under the supervision of the authors. The
+core hgs_advance algorithm is the original work of Thibaut Vidal (see below).
+The modifications were checked by running them on instances with known
+optimal solutions and by verifying solutions with an
+independent feasibility checker; users should still validate results for
+their own use.
+
 ## License and attribution
 
 This repository is a modified version of `hgs_advance` by Thibaut Vidal
